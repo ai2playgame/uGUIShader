@@ -1,6 +1,6 @@
 // Unity built-in shader source. Copyright (c) 2016 Unity Technologies. MIT license (see license.txt)
 
-Shader "AI/UI/Light"
+Shader "AI/UI/Blend"
 {
     Properties
     {
@@ -16,6 +16,14 @@ Shader "AI/UI/Light"
         _ColorMask ("Color Mask", Float) = 15
 
         [Toggle(UNITY_UI_ALPHACLIP)] _UseUIAlphaClip ("Use Alpha Clip", Float) = 0
+        
+        // Additional
+        [Enum(UnityEngine.Rendering.BlendMode)]
+        _SrcFactor("Blend Src Factor", int) = 1
+        [Enum(UnityEngine.Rendering.BlendMode)]
+        _DstFactor("Blend Src Factor", int) = 10
+        [Enum(UnityEngine.Rendering.BlendOp)]
+        _BlendOp("Blend Operator", int) = 0
     }
 
     SubShader
@@ -42,7 +50,11 @@ Shader "AI/UI/Light"
         Lighting Off
         ZWrite Off
         ZTest [unity_GUIZTestMode]
-        Blend One OneMinusSrcAlpha
+        
+        // Custom Blend Mode
+        Blend [_SrcFactor] [_DstFactor]
+        BlendOp [_BlendOp]
+        
         ColorMask [_ColorMask]
 
         Pass
