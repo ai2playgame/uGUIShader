@@ -34,8 +34,6 @@ namespace UGUIMaterial
                 return baseMaterial;
             }
             
-            BlendOp
-            
             UpdateMaterial(baseMaterial);
             return material;
         }
