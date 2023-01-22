@@ -139,7 +139,7 @@ Shader "AI/UI/Blend"
                 clip (color.a - 0.001);
                 #endif
 
-                #if defined(Normal) || defined(Lighten)
+                #if defined(Normal) || defined(Lighten) || defined(BlendAdd)
                     color.rgb *= color.a;
                 #endif
                 
