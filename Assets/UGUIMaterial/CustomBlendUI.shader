@@ -16,7 +16,7 @@ Shader "AI/UI/Blend"
         _ColorMask ("Color Mask", Float) = 15
 
         [Toggle(UNITY_UI_ALPHACLIP)] _UseUIAlphaClip ("Use Alpha Clip", Float) = 0
-        
+
         // Additional
         [Enum(UnityEngine.Rendering.BlendMode)]
         _SrcFactor("Blend Src Factor", int) = 1
@@ -51,16 +51,15 @@ Shader "AI/UI/Blend"
         ZWrite Off
         ZTest [unity_GUIZTestMode]
         
-        // Custom Blend Mode
         Blend [_SrcFactor] [_DstFactor]
         BlendOp [_BlendOp]
-        
+                
         ColorMask [_ColorMask]
 
         Pass
         {
             Name "Default"
-        CGPROGRAM
+            CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
             #pragma target 2.0
@@ -70,27 +69,28 @@ Shader "AI/UI/Blend"
 
             #pragma multi_compile_local _ UNITY_UI_CLIP_RECT
             #pragma multi_compile_local _ UNITY_UI_ALPHACLIP
+            #pragma multi_compile Normal LinearDodge Multiply Darken Lighten BlendAdd
 
             struct appdata_t
             {
-                float4 vertex   : POSITION;
-                float4 color    : COLOR;
+                float4 vertex : POSITION;
+                float4 color : COLOR;
                 float2 texcoord : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
             {
-                float4 vertex   : SV_POSITION;
-                fixed4 color    : COLOR;
-                float2 texcoord  : TEXCOORD0;
+                float4 vertex : SV_POSITION;
+                float4 color : COLOR;
+                float2 texcoord : TEXCOORD0;
                 float4 worldPosition : TEXCOORD1;
-                float4  mask : TEXCOORD2;
+                half4 mask : TEXCOORD2;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
             sampler2D _MainTex;
-            fixed4 _Color;
+            float4 _Color;
             fixed4 _TextureSampleAdd;
             float4 _ClipRect;
             float4 _MainTex_ST;
@@ -112,7 +112,8 @@ Shader "AI/UI/Blend"
                 float4 clampedRect = clamp(_ClipRect, -2e10, 2e10);
                 float2 maskUV = (v.vertex.xy - clampedRect.xy) / (clampedRect.zw - clampedRect.xy);
                 OUT.texcoord = TRANSFORM_TEX(v.texcoord.xy, _MainTex);
-                OUT.mask = float4(v.vertex.xy * 2 - clampedRect.xy - clampedRect.zw, 0.25 / (0.25 * half2(_UIMaskSoftnessX, _UIMaskSoftnessY) + abs(pixelSize.xy)));
+                OUT.mask = half4(v.vertex.xy * 2 - clampedRect.xy - clampedRect.zw,
+                                 0.25 / (0.25 * half2(_UIMaskSoftnessX, _UIMaskSoftnessY) + abs(pixelSize.xy)));
 
                 OUT.color = v.color * _Color;
                 return OUT;
@@ -120,14 +121,14 @@ Shader "AI/UI/Blend"
 
             fixed4 frag(v2f IN) : SV_Target
             {
-                //Round up the alpha color coming from the interpolator (to 1.0/256.0 steps)
-                //The incoming alpha could have numerical instability, which makes it very sensible to
-                //HDR color transparency blend, when it blends with the world's texture.
-                const half alphaPrecision = half(0xff);
-                const half invAlphaPrecision = half(1.0/alphaPrecision);
-                IN.color.a = round(IN.color.a * alphaPrecision)*invAlphaPrecision;
-
-                half4 color = IN.color * (tex2D(_MainTex, IN.texcoord) + _TextureSampleAdd);
+                float4 color;
+                #if defined(BlendAdd)
+                color = (tex2D(_MainTex, IN.texcoord) + _TextureSampleAdd);  
+                color.rgb += IN.color.rgb;  
+                color.a *= IN.color.a; 
+                #else
+                color = IN.color * (tex2D(_MainTex, IN.texcoord) + _TextureSampleAdd);
+                #endif
 
                 #ifdef UNITY_UI_CLIP_RECT
                 half2 m = saturate((_ClipRect.zw - _ClipRect.xy - abs(IN.mask.xy)) * IN.mask.zw);
@@ -138,11 +139,17 @@ Shader "AI/UI/Blend"
                 clip (color.a - 0.001);
                 #endif
 
-                color.rgb *= color.a;
-
+                #if defined(Normal) || defined(Lighten)
+                    color.rgb *= color.a;
+                #endif
+                
+                #if defined(Darken) || defined(Multiply)
+                    color.rgb = lerp(fixed3(1, 1, 1), color.rgb, color.a);
+                #endif
+                
                 return color;
             }
-        ENDCG
+            ENDCG
         }
     }
 }
